@@ -1,0 +1,62 @@
+services:
+  # ===========================================================================
+  # 1. QuantBot Pro Web Terminal (React Dashboard, Charts & Backtesting Studio)
+  # ===========================================================================
+  quantbot-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quantbot-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    volumes:
+      - trade-data:/app/data
+
+  # ===========================================================================
+  # 2. QuantBot Autonomous Python Trading Bot Execution Service
+  # ===========================================================================
+  quantbot-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    container_name: quantbot-bot
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f quantbot.py > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    environment:
+      - EXCHANGE_ID=${EXCHANGE_ID:-binance}
+      - SYMBOL=${SYMBOL:-BTC/USDT}
+      - TIMEFRAME=${TIMEFRAME:-1h}
+      - PAPER_TRADING=${PAPER_TRADING:-True}
+      - FAST_PERIOD=${FAST_PERIOD:-9}
+      - SLOW_PERIOD=${SLOW_PERIOD:-21}
+      - RSI_PERIOD=${RSI_PERIOD:-14}
+      - STOP_LOSS_PCT=${STOP_LOSS_PCT:-0.02}
+      - TAKE_PROFIT_PCT=${TAKE_PROFIT_PCT:-0.05}
+      - TRAILING_STOP_PCT=${TRAILING_STOP_PCT:-0.015}
+      - ALLOCATION_PCT=${ALLOCATION_PCT:-0.25}
+      - EXCHANGE_API_KEY=${EXCHANGE_API_KEY:-}
+      - EXCHANGE_SECRET_KEY=${EXCHANGE_SECRET_KEY:-}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - trade-data:/app/data
+      - ./quantbot.py:/app/quantbot.py:ro
+
+volumes:
+  trade-data:
+    name: quantbot-trade-data
