@@ -421,10 +421,10 @@ volumes:
                       : 'Real-time candlestick chart with SMA, Bollinger Bands, and RSI / MACD sub-panels.'}
                   </li>
                   <li>
-                    <strong className="text-white">{lang === 'FA' ? 'کلید خروج اضطراری (Emergency Flatten):' : 'Emergency Flatten:'}</strong>{' '}
+                    <strong className="text-white">{lang === 'FA' ? 'دفتر معاملات و نمودار منحنی سرمایه (Equity Curve):' : 'Trade Ledger & Equity Curve:'}</strong>{' '}
                     {lang === 'FA'
-                      ? 'بستن سریع تمامی پوزیشن‌های باز به نقدینگی تتر در نوسانات شدید بازار.'
-                      : 'Liquidates all open positions instantly to USDT cash.'}
+                      ? 'رسم خودکار منحنی تغییرات سرمایه (Equity) در ۳۰ نشست معاملاتی اخیر با Recharts، خط مرجع پایه، سقف تاریخی سرمایه (High-Water Mark) و ریزمعاملات.'
+                      : 'Interactive Recharts line chart tracking cumulative portfolio equity across the last 30 trade sessions with high-water marks and drawdown metrics.'}
                   </li>
                 </ul>
               </div>

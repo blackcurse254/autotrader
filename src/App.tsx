@@ -21,6 +21,7 @@ import { BacktestModal } from './components/BacktestModal';
 import { PythonCodeModal } from './components/PythonCodeModal';
 import { AiQuantCopilot } from './components/AiQuantCopilot';
 import { UserGuideModal } from './components/UserGuideModal';
+import { generateSampleTradeHistory } from './utils/sampleTrades';
 
 const INITIAL_CAPITAL = 10000;
 
@@ -36,9 +37,15 @@ export default function App() {
   const [botState, setBotState] = useState<BotState>('RUNNING');
   const [simSpeed, setSimSpeed] = useState<number>(2); // 1x, 2x, 5x, 10x
 
-  const [cash, setCash] = useState<number>(INITIAL_CAPITAL);
+  const [trades, setTrades] = useState<TradeRecord[]>(() => {
+    return generateSampleTradeHistory(SUPPORTED_ASSETS[0].symbol, SUPPORTED_ASSETS[0].basePrice, 24);
+  });
+  const [cash, setCash] = useState<number>(() => {
+    const sample = generateSampleTradeHistory(SUPPORTED_ASSETS[0].symbol, SUPPORTED_ASSETS[0].basePrice, 24);
+    const pnl = sample.reduce((sum, t) => sum + t.realizedPnlUSD, 0);
+    return Number((INITIAL_CAPITAL + pnl).toFixed(2));
+  });
   const [position, setPosition] = useState<Position | null>(null);
-  const [trades, setTrades] = useState<TradeRecord[]>([]);
   const [logs, setLogs] = useState<ExecutionLog[]>(() => [
     {
       id: 'init-1',
@@ -158,6 +165,15 @@ export default function App() {
     setCash(INITIAL_CAPITAL);
     setTrades([]);
     addLog('INFO', 'Portfolio balance reset to $10,000 USDT.');
+  };
+
+  // Populate 30 sample trade sessions
+  const handlePopulateSampleTrades = () => {
+    const sample = generateSampleTradeHistory(selectedAsset.symbol, currentPrice, 30);
+    setTrades(sample);
+    const pnl = sample.reduce((sum, t) => sum + t.realizedPnlUSD, 0);
+    setCash(Number((INITIAL_CAPITAL + pnl).toFixed(2)));
+    addLog('INFO', `Loaded 30 trade sessions for ${selectedAsset.symbol} equity curve visualization.`);
   };
 
   // Emergency Flatten
@@ -514,8 +530,11 @@ export default function App() {
             position={position}
             trades={trades}
             logs={logs}
+            initialCapital={INITIAL_CAPITAL}
+            currentEquity={totalEquity}
             onClosePosition={handleEmergencyFlatten}
             onClearLogs={() => setLogs([])}
+            onPopulateSampleSessions={handlePopulateSampleTrades}
           />
         </section>
       </main>
