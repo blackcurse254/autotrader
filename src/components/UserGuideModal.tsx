@@ -26,11 +26,88 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ onClose }) => {
     URL.revokeObjectURL(url);
   };
 
-  const dockerComposeCmd = `docker compose up -d`;
+  const dockerComposeCmd = `docker compose up -d --build`;
   const dockerBuildCmd = `docker build -t quantbot-pro .\ndocker run -d -p 3000:3000 --name quantbot-web --restart unless-stopped quantbot-pro`;
   const dockerLogsBotCmd = `docker logs -f quantbot-bot`;
   const dockerLogsWebCmd = `docker logs -f quantbot-web`;
   const pipSnippet = `pip install ccxt pandas numpy python-dotenv`;
+
+  const botDockerfileContent = `FROM python:3.11-slim
+
+WORKDIR /app
+ENV PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends procps && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY quantbot.py ./
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \\
+  CMD pgrep -f quantbot.py > /dev/null || exit 1
+
+CMD ["python", "-u", "quantbot.py"]
+`;
+
+  const composeYamlContent = `services:
+  quantbot-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quantbot-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    volumes:
+      - trade-data:/app/data
+
+  quantbot-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    container_name: quantbot-bot
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f quantbot.py > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    environment:
+      - EXCHANGE_ID=binance
+      - SYMBOL=BTC/USDT
+      - PAPER_TRADING=True
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - trade-data:/app/data
+      - ./quantbot.py:/app/quantbot.py:ro
+
+volumes:
+  trade-data:
+    name: quantbot-trade-data
+`;
+
+  const requirementsTxtContent = `ccxt>=4.2.0
+pandas>=2.2.0
+numpy>=1.26.0
+python-dotenv>=1.0.0
+`;
+
+  const downloadAllDockerBundle = () => {
+    downloadFile('Dockerfile.bot', botDockerfileContent);
+    setTimeout(() => downloadFile('docker-compose.yml', composeYamlContent), 250);
+    setTimeout(() => downloadFile('requirements.txt', requirementsTxtContent), 500);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
@@ -267,76 +344,43 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ onClose }) => {
                     {copiedKey === 'compose' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                   </button>
                 </div>
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400 pt-1">
-                  <span>
-                    {lang === 'FA' ? 'آدرس داشبورد وب:' : 'Web Dashboard URL:'}{' '}
-                    <code className="text-emerald-400 font-mono">http://localhost:3000</code>
-                  </span>
-                  <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400 pt-2 border-t border-slate-800/60">
+                  <div className="flex items-center gap-1.5">
+                    <span>
+                      {lang === 'FA' ? 'آدرس داشبورد وب:' : 'Web Dashboard URL:'}{' '}
+                      <code className="text-emerald-400 font-mono">http://localhost:3000</code>
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
-                      onClick={() => {
-                        const botDockerfile = `FROM python:3.11-slim\n\nWORKDIR /app\nENV PYTHONUNBUFFERED=1\n\nRUN apt-get update && apt-get install -y --no-install-recommends procps && rm -rf /var/lib/apt/lists/*\n\nCOPY requirements.txt ./\nRUN pip install --no-cache-dir -r requirements.txt\n\nCOPY quantbot.py ./\n\nHEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \\\n  CMD pgrep -f quantbot.py > /dev/null || exit 1\n\nCMD ["python", "-u", "quantbot.py"]\n`;
-                        downloadFile('Dockerfile.bot', botDockerfile);
-                      }}
-                      className="flex items-center gap-1 text-[11px] text-emerald-400 hover:underline font-mono"
+                      onClick={downloadAllDockerBundle}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-[11px] shadow-sm transition-colors"
+                      title="Download all required Docker files"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>{lang === 'FA' ? 'دانلود یکجای بسته Docker' : 'Download All Docker Files'}</span>
+                    </button>
+                    <button
+                      onClick={() => downloadFile('Dockerfile.bot', botDockerfileContent)}
+                      className="flex items-center gap-1 text-[11px] text-emerald-400 hover:underline font-mono bg-slate-900 px-2 py-0.5 rounded border border-slate-800"
                     >
                       <Download className="w-3 h-3" />
                       Dockerfile.bot
                     </button>
                     <button
-                      onClick={() => {
-                        const composeYaml = `services:
-  quantbot-web:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: quantbot-web
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - PORT=3000
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    volumes:
-      - trade-data:/app/data
-
-  quantbot-bot:
-    build:
-      context: .
-      dockerfile: Dockerfile.bot
-    container_name: quantbot-bot
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pgrep -f quantbot.py > /dev/null || exit 1"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    environment:
-      - EXCHANGE_ID=binance
-      - SYMBOL=BTC/USDT
-      - PAPER_TRADING=True
-      - PYTHONUNBUFFERED=1
-    volumes:
-      - trade-data:/app/data
-      - ./quantbot.py:/app/quantbot.py:ro
-
-volumes:
-  trade-data:
-    name: quantbot-trade-data
-`;
-                        downloadFile('docker-compose.yml', composeYaml);
-                      }}
-                      className="flex items-center gap-1 text-[11px] text-cyan-400 hover:underline font-mono"
+                      onClick={() => downloadFile('docker-compose.yml', composeYamlContent)}
+                      className="flex items-center gap-1 text-[11px] text-cyan-400 hover:underline font-mono bg-slate-900 px-2 py-0.5 rounded border border-slate-800"
                     >
                       <Download className="w-3 h-3" />
                       docker-compose.yml
+                    </button>
+                    <button
+                      onClick={() => downloadFile('requirements.txt', requirementsTxtContent)}
+                      className="flex items-center gap-1 text-[11px] text-amber-400 hover:underline font-mono bg-slate-900 px-2 py-0.5 rounded border border-slate-800"
+                    >
+                      <Download className="w-3 h-3" />
+                      requirements.txt
                     </button>
                   </div>
                 </div>
